@@ -1,9 +1,10 @@
-import Home from './pages/Home';
+import AppRoutes from "./routes/AppRoutes";
+import Header from "./components/Header";
 
 function App() {
   return (
     <div className="App">
-      <Home/>
+      <AppRoutes />
     </div>
   );
 }

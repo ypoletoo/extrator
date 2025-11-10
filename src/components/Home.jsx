@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import { Form, Input, Button, Typography, message } from "antd";
 import { GithubOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
 const Home = () => {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
+  const navigate = useNavigate();
 
   const onFinish = (values) => {
     console.log("Dados recebidos:", values);
+    navigate("/informacoes/1");
     setLoading(true);
 
     setTimeout(() => {
@@ -23,11 +26,9 @@ const Home = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 space-y-12">
-
       <Typography.Title level={2} className="text-center mb-8 text-gray-800">
         Insira os dados do repositório para começar
       </Typography.Title>
-
 
       <div className="bg-white p-8 w-[60%] rounded-2xl shadow-xl ">
         <Form
