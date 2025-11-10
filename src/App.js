@@ -1,12 +1,13 @@
-import AppRoutes from "./routes/AppRoutes";
-import Header from "./components/Header";
+import React from "react";
+import { BrowserRouter as Router } from "react-router-dom";
+import AppRoutesInner from "./routes/AppRoutes";
 
-function App() {
+const App = () => {
   return (
-    <div className="App">
-      <AppRoutes />
-    </div>
+    <Router>
+      <AppRoutesInner />
+    </Router>
   );
-}
+};
 
 export default App;
