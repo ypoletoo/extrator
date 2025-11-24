@@ -1,121 +1,63 @@
-import React, { useState } from "react";
-import { Form, Input, Button, Typography, message } from "antd";
-import { GithubOutlined } from "@ant-design/icons";
+import { Button } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import CardHome from "../components/CardHome";
 
-const Home = () => {
-  const [loading, setLoading] = useState(false);
-  const [form] = Form.useForm();
+const projetosMock = [
+  {
+    nomeProjeto: "chatgpt-analytics",
+    dataUltimaColeta: "2025-01-12",
+    qtdIssues: 42,
+    qtdUsers: 18,
+    qtdPRs: 27,
+    qtdArquivos: 134,
+  },
+  {
+    nomeProjeto: "frontend-dashboard",
+    dataUltimaColeta: "2025-02-03",
+    qtdIssues: 15,
+    qtdUsers: 9,
+    qtdPRs: 11,
+    qtdArquivos: 76,
+  },
+  {
+    nomeProjeto: "bot-automation-core",
+    dataUltimaColeta: "2024-12-28",
+    qtdIssues: 63,
+    qtdUsers: 25,
+    qtdPRs: 41,
+    qtdArquivos: 212,
+  },
+];
+
+export default function Home() {
   const navigate = useNavigate();
 
-  const onFinish = (values) => {
-    console.log("Dados recebidos:", values);
-    navigate("/informacoes/1");
-    setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
-      message.success("Dados extraídos com sucesso! (Simulação)");
-    }, 2000);
-  };
-
-  const onFinishFailed = (errorInfo) => {
-    console.log("Falha ao enviar:", errorInfo);
-    message.error("Por favor, preencha todos os campos.");
-  };
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 space-y-12">
-      <Typography.Title level={2} className="text-center mb-8 text-gray-800">
-        Insira os dados do repositório para começar
-      </Typography.Title>
+    <div className="p-8 text-gray-100 max-h-screen overflow-auto">
+      <h2 className="text-3xl font-semibold mb-8 text-gray-800">
+        Projetos GitHub
+      </h2>
 
-      <div className="bg-white p-8 w-[60%] rounded-2xl shadow-xl ">
-        <Form
-          form={form}
-          name="form"
-          layout="vertical"
-          onFinish={onFinish}
-          onFinishFailed={onFinishFailed}
-          autoComplete="off"
-          initialValues={{
-            owner: "",
-            repo: "",
-            token: "",
-          }}
+      <div className="w-full md:w-9/12 lg:w-3/5 mx-auto">
+        {projetosMock.map((projeto, index) => (
+          <CardHome key={index} projeto={projeto} />
+        ))}
+
+        <Button
+          type="default"
+          onClick={() => navigate("/extrator")}
+          icon={<PlusOutlined />}
+          className="
+            w-full py-6 mt-2 text-lg font-medium
+            bg-gray-200 hover:bg-gray-300 text-gray-800
+            border-none rounded-xl
+            transition-all duration-200
+          "
         >
-          <Form.Item
-            label={
-              <span className="font-medium text-gray-700">
-                Dono do repositório
-              </span>
-            }
-            name="owner"
-            rules={[
-              {
-                required: true,
-                message: "Por favor, insira o dono do repositório!",
-              },
-            ]}
-          >
-            <Input
-              size="large"
-              placeholder="Ex: usuario"
-              prefix={
-                <GithubOutlined className="site-form-item-icon text-gray-400" />
-              }
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={
-              <span className="font-medium text-gray-700">Repositório</span>
-            }
-            name="repo"
-            rules={[
-              {
-                required: true,
-                message: "Por favor, insira o nome do repositório!",
-              },
-            ]}
-          >
-            <Input size="large" placeholder="Ex: jabRef" />
-          </Form.Item>
-
-          <Form.Item
-            label={
-              <span className="font-medium text-gray-700">Token github</span>
-            }
-            name="token"
-            rules={[
-              {
-                required: true,
-                message: "Por favor, insira o seu token do GitHub!",
-              },
-            ]}
-          >
-            <Input.Password
-              size="large"
-              placeholder="Ex: ghp_a9dasd798a7d..."
-            />
-          </Form.Item>
-
-          <Form.Item className="mt-10">
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              size="large"
-              block
-              className="bg-gray-800 hover:bg-gray-700 text-white font-semibold"
-            >
-              {loading ? "Extraindo..." : "Extrair"}
-            </Button>
-          </Form.Item>
-        </Form>
+          Extrair novo projeto
+        </Button>
       </div>
     </div>
   );
-};
-
-export default Home;
+}

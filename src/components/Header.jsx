@@ -1,24 +1,20 @@
-import { Button, Typography } from "antd";
-import { ArrowLeftOutlined, HomeOutlined } from "@ant-design/icons";
+import { Button } from "antd";
+import { HomeOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
 const Header = () => {
   const navigate = useNavigate();
 
-  const handleGoHome = () => {
-    navigate("/");
-  };
-
   return (
-    <header className="w-full bg-gray-800 shadow-md py-4 px-8 flex items-center justify-start">
+    <header className="w-20 h-full bg-gray-800 p-2 flex flex-col space-y-8 items-center">
+      <div className="text-white py-4 border-b">Logo</div>
+
       <Button
-        icon={<ArrowLeftOutlined />}
+        icon={<HomeOutlined />}
         type="text"
-        className="text-white font-semibold hover:!text-white hover:underline"
-        onClick={handleGoHome}
-      >
-        Voltar
-      </Button>
+        className="text-white text-2xl hover:!text-white hover:underline"
+        onClick={() => navigate("/")}
+      />
     </header>
   );
 };
