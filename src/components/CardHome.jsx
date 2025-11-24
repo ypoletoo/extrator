@@ -4,6 +4,7 @@ import {
   PlusOutlined,
   MinusOutlined,
   ArrowUpOutlined,
+  OpenAIOutlined,
 } from "@ant-design/icons";
 
 const { TextArea } = Input;
@@ -19,18 +20,18 @@ export default function CardHome({ projeto }) {
         bg-gray-800 transition-all duration-[1200ms] ease-in-out
       "
     >
-      <div className="flex items-center gap-4">
+      <div className="flex flex-row items-center gap-4">
         <Button
+          className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
           shape="circle"
           onClick={() => setAberto(!aberto)}
           icon={
             aberto ? (
               <MinusOutlined className="text-gray-200" />
             ) : (
-              <PlusOutlined className="text-gray-200" />
+              <OpenAIOutlined className="text-gray-200 h-20" />
             )
           }
-          className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
         />
 
         <span className="text-xl font-semibold text-gray-100">
@@ -62,9 +63,10 @@ export default function CardHome({ projeto }) {
             ${aberto ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"}
           `}
         >
+          <h2 className="text-lg text-gray-200 font-bold">Pergunte algo</h2>
           <div className="mt-6 relative">
             <label className="text-gray-300 block mb-2 text-sm font-medium">
-              Digite algo para este projeto:
+              O que você quer saber sobre esse projeto?
             </label>
 
             <TextArea
