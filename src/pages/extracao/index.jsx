@@ -1,10 +1,14 @@
 import React, { useState } from "react";
-import { Card, Input, Checkbox, Button, Progress } from "antd";
+import { Card, Input, Checkbox, Button, message } from "antd";
 import { useNavigate } from "react-router-dom";
+import {
+  createExtraction,
+  startExtraction,
+} from "../../services/extractionServices";
 
 export default function Extractor() {
   const [form, setForm] = useState({
-    projeto: "",
+    repoName: "",
     owner: "",
     token: "",
     options: {
@@ -17,7 +21,6 @@ export default function Extractor() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -30,52 +33,48 @@ export default function Extractor() {
     }));
   };
 
-  const startExtraction = () => {
+  const startExtraction = async () => {
+    const { owner, repoName, token } = form;
+
+    if (!owner || !repoName || !token) {
+      message.error(
+        "Preencha o Dono do Repositório, Nome e Token do GitHub.",
+        3
+      );
+      return;
+    }
+
     setLoading(true);
-    setProgress(0);
 
-    let value = 0;
+    try {
+      const newExtraction = await createExtraction(owner, repoName);
+      const extractionId = newExtraction.id;
 
-    const interval = setInterval(() => {
-      value += 2;
-      setProgress(value);
+      message.info(
+        `Extração registrada (ID: ${extractionId}). Iniciando processo no backend...`,
+        3
+      );
 
-      if (value >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setLoading(false);
-          navigate("/");
-        }, 500);
-      }
-    }, 100);
+      await startExtraction(extractionId, token);
+
+      message.success(
+        "Extração iniciada com sucesso! Acompanhe o status na tela inicial.",
+        5
+      );
+
+      navigate("/");
+    } catch (error) {
+      console.error("Erro no processo de extração:", error);
+      const errorMessage =
+        error.response?.data?.error || "Ocorreu um erro desconhecido na API.";
+      message.error(errorMessage, 5);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <>
-      {loading && (
-        <div
-          className="
-            absolute inset-0 bg-black bg-opacity-50 
-            flex items-center justify-center z-50 
-            backdrop-blur-sm transition-all duration-300
-          "
-        >
-          <div className="w-2/3 max-w-md p-8 bg-white rounded-2xl shadow-xl text-center">
-            <h3 className="text-xl font-semibold text-gray-800 mb-6">
-              Extraindo dados do projeto...
-            </h3>
-
-            <Progress
-              type="circle"
-              percent={progress}
-              status={progress < 100 ? "active" : "success"}
-              strokeWidth={10}
-              strokeColor={progress < 100 ? "#1F2937" : "#52c41a"}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="relative p-8 max-h-screen overflow-y-auto">
         <h2 className="text-3xl font-semibold mb-8 text-gray-800">
           Extrair Projeto
@@ -85,12 +84,12 @@ export default function Extractor() {
           <Card className="shadow-lg rounded-2xl transition-all duration-300">
             <div className="mb-6">
               <label className="block mb-2 text-gray-800">
-                Nome do Projeto
+                Nome do Repositório (repoName)
               </label>
               <Input
-                placeholder="ex: meu-projeto"
-                value={form.projeto}
-                onChange={(e) => updateField("projeto", e.target.value)}
+                placeholder="ex: react"
+                value={form.repoName}
+                onChange={(e) => updateField("repoName", e.target.value)}
                 className="placeholder-gray-400"
                 size="large"
                 disabled={loading}
@@ -99,10 +98,10 @@ export default function Extractor() {
 
             <div className="mb-6">
               <label className="block mb-2 text-gray-800">
-                Dono do Repositório
+                Dono do Repositório (owner)
               </label>
               <Input
-                placeholder="ex: usuario"
+                placeholder="ex: facebook"
                 value={form.owner}
                 onChange={(e) => updateField("owner", e.target.value)}
                 className="placeholder-gray-400"
@@ -176,6 +175,7 @@ export default function Extractor() {
                 transition-all duration-200
               "
               onClick={startExtraction}
+              loading={loading}
               disabled={loading}
             >
               Extrair Projeto

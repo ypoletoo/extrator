@@ -1,37 +1,43 @@
-import { Button } from "antd";
+import { Alert, Button, Spin } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import CardHome from "../components/CardHome";
-
-const projetosMock = [
-  {
-    nomeProjeto: "chatgpt-analytics",
-    dataUltimaColeta: "2025-01-12",
-    qtdIssues: 42,
-    qtdUsers: 18,
-    qtdPRs: 27,
-    qtdArquivos: 134,
-  },
-  {
-    nomeProjeto: "frontend-dashboard",
-    dataUltimaColeta: "2025-02-03",
-    qtdIssues: 15,
-    qtdUsers: 9,
-    qtdPRs: 11,
-    qtdArquivos: 76,
-  },
-  {
-    nomeProjeto: "bot-automation-core",
-    dataUltimaColeta: "2024-12-28",
-    qtdIssues: 63,
-    qtdUsers: 25,
-    qtdPRs: 41,
-    qtdArquivos: 212,
-  },
-];
+import { useCallback, useEffect, useState } from "react";
+import { listExtractions } from "../services/extractionServices";
 
 export default function Home() {
   const navigate = useNavigate();
+  const [extractions, setExtractions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchExtractions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listExtractions();
+
+      setExtractions(
+        data.map((e) => ({
+          nomeProjeto: `${e.owner}/${e.repoName}`,
+          dataUltimaColeta: e.updatedAt
+            ? new Date(e.updatedAt).toLocaleDateString()
+            : "N/A",
+          status: e.status,
+          id: e.id,
+        }))
+      );
+    } catch (err) {
+      setError("Erro ao carregar a lista de extrações.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchExtractions();
+  }, [fetchExtractions]);
 
   return (
     <div className="p-8 text-gray-100 max-h-screen overflow-auto">
@@ -40,8 +46,35 @@ export default function Home() {
       </h2>
 
       <div className="w-full md:w-9/12 lg:w-3/5 mx-auto">
-        {projetosMock.map((projeto, index) => (
-          <CardHome key={index} projeto={projeto} />
+        {error && (
+          <Alert
+            message="Erro"
+            description={error}
+            type="error"
+            showIcon
+            className="mb-4"
+          />
+        )}
+
+        {loading && (
+          <div className="text-center py-10">
+            <Spin size="large" />
+            <p className="mt-2 text-gray-600">Carregando extrações...</p>
+          </div>
+        )}
+
+        {!loading && extractions.length === 0 && !error && (
+          <Alert
+            message="Nenhuma extração encontrada"
+            description="Use o botão abaixo para extrair um novo projeto."
+            type="info"
+            showIcon
+            className="mb-4"
+          />
+        )}
+
+        {extractions.map((extraction) => (
+          <CardHome key={extraction.id} projeto={extraction} />
         ))}
 
         <Button
