@@ -91,6 +91,7 @@ export default function CardHome({ projeto }) {
         <div className="flex flex-row items-center gap-4">
           {projeto.status === "completed" && (
             <Button
+              disabled
               className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
               shape="circle"
               onClick={() => setAberto(!aberto)}

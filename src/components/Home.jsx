@@ -11,7 +11,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // referência do interval para poder limpar corretamente
   const pollingRef = useRef(null);
 
   const fetchExtractions = useCallback(async () => {
