@@ -2,7 +2,7 @@ import { Alert, Button, Spin } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import CardHome from "../components/CardHome";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { listExtractions } from "../services/extractionServices";
 
 export default function Home() {
@@ -11,33 +11,60 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // referência do interval para poder limpar corretamente
+  const pollingRef = useRef(null);
+
   const fetchExtractions = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const data = await listExtractions();
-
       setExtractions(
-        data.map((e) => ({
-          nomeProjeto: `${e.owner}/${e.repoName}`,
-          dataUltimaColeta: e.updatedAt
-            ? new Date(e.updatedAt).toLocaleDateString()
-            : "N/A",
-          status: e.status,
-          id: e.id,
+        data.map((project) => ({
+          id: project.id,
+          repository_owner: project.repository_owner,
+          repository_name: project.repository_name,
+          status: project.status,
+          current_step: project.current_step,
+          progress_percentage: project.progress_percentage,
+          total_issues_expected: project.total_issues_expected,
+          total_issues_fetched: project.total_issues_fetched,
+          total_prs_expected: project.total_prs_expected,
+          error_message: project.error_message,
+          finished_at: project.finished_at,
+          updated_at: project.updated_at,
         }))
       );
     } catch (err) {
-      setError("Erro ao carregar a lista de extrações.");
       console.error(err);
-    } finally {
-      setLoading(false);
+      setError("Erro ao carregar a lista de extrações.");
     }
   }, []);
 
   useEffect(() => {
-    fetchExtractions();
+    setLoading(true);
+    fetchExtractions().finally(() => setLoading(false));
   }, [fetchExtractions]);
+
+  useEffect(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    const hasRunning = extractions.some(
+      (e) => e.status === "running" || e.status === "processing"
+    );
+
+    if (hasRunning) {
+      pollingRef.current = setInterval(fetchExtractions, 10000);
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [extractions, fetchExtractions]);
 
   return (
     <div className="p-8 text-gray-100 max-h-screen overflow-auto">
@@ -74,7 +101,11 @@ export default function Home() {
         )}
 
         {extractions.map((extraction) => (
-          <CardHome key={extraction.id} projeto={extraction} />
+          <CardHome
+            key={extraction.id}
+            projeto={extraction}
+            onStatusChanged={fetchExtractions}
+          />
         ))}
 
         <Button

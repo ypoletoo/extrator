@@ -9,7 +9,7 @@ import {
   SyncOutlined,
   StopOutlined,
 } from "@ant-design/icons";
-
+import { format } from "date-fns";
 const { TextArea } = Input;
 
 const getStatusDisplay = (status) => {
@@ -25,14 +25,14 @@ const getStatusDisplay = (status) => {
       return {
         label: "Concluída",
         icon: <CheckCircleOutlined className="text-green-400" />,
-        value: status.toUpperCase(),
+        value: "completa".toUpperCase(),
         color: "green-400",
       };
     case "paused":
       return {
         label: "Pausada",
         icon: <StopOutlined className="text-yellow-400" />,
-        value: status.toUpperCase(),
+        value: "pausada".toUpperCase(),
         color: "yellow-400",
       };
     case "created":
@@ -41,6 +41,13 @@ const getStatusDisplay = (status) => {
         icon: <ClockCircleOutlined className="text-gray-400" />,
         value: status.toUpperCase(),
         color: "gray-400",
+      };
+    case "failed":
+      return {
+        label: "Falhou",
+        icon: <StopOutlined className="text-red-600" />,
+        value: "erro".toUpperCase(),
+        color: "red-600",
       };
     default:
       return {
@@ -55,6 +62,7 @@ const getStatusDisplay = (status) => {
 export default function CardHome({ projeto }) {
   const [aberto, setAberto] = useState(false);
   const [texto, setTexto] = useState("");
+  const [hoveredInfo, setHoveredInfo] = useState(null);
 
   const statusDisplay = getStatusDisplay(projeto.status);
 
@@ -66,13 +74,11 @@ export default function CardHome({ projeto }) {
       icon: statusDisplay.icon,
       color: statusDisplay.color,
     },
-    { label: "Última Atualização", value: projeto.dataUltimaColeta || "N/A" },
+    {
+      label: "Última Atualização",
+      value: format(projeto.updated_at, "dd/MM/yyyy HH:mm") || "N/A",
+    },
   ];
-
-  const showControls =
-    projeto.status === "paused" ||
-    projeto.status === "created" ||
-    projeto.status === "running";
 
   return (
     <Card
@@ -83,67 +89,42 @@ export default function CardHome({ projeto }) {
     >
       <div className="flex flex-row items-center justify-between gap-4">
         <div className="flex flex-row items-center gap-4">
-          <Button
-            className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
-            shape="circle"
-            onClick={() => setAberto(!aberto)}
-            icon={
-              aberto ? (
-                <MinusOutlined className="text-gray-200" />
-              ) : (
-                <OpenAIOutlined className="text-gray-200 h-20" />
-              )
-            }
-          />
+          {projeto.status === "completed" && (
+            <Button
+              className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
+              shape="circle"
+              onClick={() => setAberto(!aberto)}
+              icon={
+                aberto ? (
+                  <MinusOutlined className="text-gray-200" />
+                ) : (
+                  <OpenAIOutlined className="text-gray-200 h-20" />
+                )
+              }
+            />
+          )}
 
           <span className="text-xl font-semibold text-gray-100">
-            {projeto.nomeProjeto}
+            {projeto.repository_name}/{projeto.repository_owner}
           </span>
         </div>
-
-        {showControls && (
-          <div className="flex gap-2">
-            <Button
-              className={`
-                border-none text-gray-100 font-medium
-                ${
-                  projeto.status === "running"
-                    ? "bg-yellow-600 hover:bg-yellow-500"
-                    : "bg-green-600 hover:bg-green-500"
-                }
-              `}
-              onClick={() =>
-                console.log(
-                  `Ação para ${
-                    projeto.status === "running" ? "Pausar" : "Iniciar"
-                  } extração ${projeto.id}`
-                )
-              }
-              icon={
-                projeto.status === "running" ? (
-                  <StopOutlined />
-                ) : (
-                  <SyncOutlined />
-                )
-              }
-            >
-              {projeto.status === "running" ? "Pausar" : "Iniciar/Retomar"}
-            </Button>
-          </div>
-        )}
       </div>
 
       <div className="h-px w-full bg-gray-700 my-4" />
 
       {!aberto && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="relative grid grid-cols-2 md:grid-cols-3 gap-4 min-h-[100px]">
           {infoItems.map((item, index) => (
             <InfoItem
               key={index}
+              index={index}
               label={item.label}
               value={item.value}
               icon={item.icon}
               color={item.color}
+              hoveredInfo={hoveredInfo}
+              setHoveredInfo={setHoveredInfo}
+              projeto={projeto}
             />
           ))}
         </div>
@@ -151,13 +132,13 @@ export default function CardHome({ projeto }) {
 
       <div
         className={`
-          overflow-hidden transition-all duration-[1200ms] ease-in-out
+          overflow-hidden transition-all duration-[1200ms]
           ${aberto ? "max-h-[600px]" : "max-h-0"}
         `}
       >
         <div
           className={`
-            transform transition-all duration-[1200ms] ease-in-out
+            transform transition-all duration-[1200ms]
             ${aberto ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"}
           `}
         >
@@ -191,24 +172,77 @@ export default function CardHome({ projeto }) {
     </Card>
   );
 }
+function InfoItem({
+  index,
+  label,
+  value,
+  icon,
+  color,
+  hoveredInfo,
+  setHoveredInfo,
+  projeto,
+}) {
+  const isHovered = hoveredInfo === index;
+  const someoneHovered = hoveredInfo !== null;
+  const shouldHide = someoneHovered && !isHovered;
 
-function InfoItem({ label, value, icon, color }) {
   return (
     <div
-      className="
-        bg-gray-700 rounded-xl px-4 py-3 
-        shadow-md hover:bg-gray-650 transition
-      "
+      onMouseEnter={() => setHoveredInfo(index)}
+      onMouseLeave={() => setHoveredInfo(null)}
+      className={`
+        bg-gray-700 rounded-xl px-4 py-3 shadow-md cursor-pointer
+        transition-all duration-500 overflow-hidden relative
+        h-32
+        ${isHovered ? "z-20" : "z-10"}
+        ${shouldHide ? "opacity-0 scale-90 pointer-events-none absolute" : ""}
+      `}
+      style={{
+        ...(isHovered && {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          width: "100%",
+        }),
+      }}
     >
       <p className="text-gray-400 text-sm">{label}</p>
+
       <p
-        className={`text-gray-100 font-medium text-lg leading-tight ${
+        className={`text-gray-100 font-medium text-lg flex items-center gap-1 ${
           color ? `text-${color}` : ""
         }`}
       >
-        {icon && <span className="mr-1">{icon}</span>}
+        {icon}
         {value}
       </p>
+
+      <div
+        className={`
+          transition-all duration-500 text-gray-300 text-sm mt-2
+          ${isHovered ? "opacity-100" : "opacity-0"}
+        `}
+        style={{ maxHeight: isHovered ? "60px" : "0px" }}
+      >
+        {label === "Status" && (
+          <p>
+            <b>{projeto.error_message}</b>
+            {projeto.status === "running" && (
+              <span>Coletando dados ({projeto.progress_percentage}%)</span>
+            )}
+          </p>
+        )}
+        {label === "ID da Extração" && (
+          <p>
+            ID completo: <b>{projeto.id}</b>
+          </p>
+        )}
+        {label === "Última Atualização" && (
+          <p>
+            Última coleta em: <b>{projeto.updated_at || "Sem registro"}</b>
+          </p>
+        )}
+      </div>
     </div>
   );
 }
