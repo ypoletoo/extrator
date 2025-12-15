@@ -7,6 +7,7 @@ import { listExtractions } from "../services/extractionServices";
 
 export default function Home() {
   const navigate = useNavigate();
+
   const [extractions, setExtractions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,6 +17,7 @@ export default function Home() {
   const fetchExtractions = useCallback(async () => {
     try {
       const data = await listExtractions();
+
       setExtractions(
         data.map((project) => ({
           id: project.id,
@@ -32,17 +34,37 @@ export default function Home() {
           updated_at: project.updated_at,
         }))
       );
+
+      // ✅ limpa erro se a chamada voltou a funcionar
+      setError(null);
     } catch (err) {
-      console.error(err);
-      setError("Erro ao carregar a lista de extrações.");
+      console.error("Erro ao buscar extrações:", err);
+
+      // ✅ erro tratado, NÃO lança
+      setError(
+        err?.response?.data?.error || "Erro ao carregar a lista de extrações."
+      );
     }
   }, []);
 
+  // 🔹 primeira carga
   useEffect(() => {
-    setLoading(true);
-    fetchExtractions().finally(() => setLoading(false));
+    let mounted = true;
+
+    const load = async () => {
+      setLoading(true);
+      await fetchExtractions();
+      if (mounted) setLoading(false);
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
   }, [fetchExtractions]);
 
+  // 🔹 polling inteligente
   useEffect(() => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -54,7 +76,9 @@ export default function Home() {
     );
 
     if (hasActiveProcess) {
-      pollingRef.current = setInterval(fetchExtractions, 5000);
+      pollingRef.current = setInterval(() => {
+        fetchExtractions(); // ✅ nunca quebra a UI
+      }, 5000);
     }
 
     return () => {

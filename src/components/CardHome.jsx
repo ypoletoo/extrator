@@ -8,11 +8,13 @@ import {
   DeleteOutlined,
   RedoOutlined,
   ExclamationCircleOutlined,
+  PauseCircleFilled,
 } from "@ant-design/icons";
 import { format } from "date-fns";
 import {
   createExtraction,
   deleteExtraction,
+  pauseExtraction,
   startExtraction as startExtractionService,
 } from "../services/extractionServices";
 
@@ -22,6 +24,7 @@ export default function CardHome({ projeto, onStatusChanged }) {
   const [activeIndex, setActiveIndex] = useState(null);
   const [form] = Form.useForm();
   const [retryLoading, setRetryLoading] = useState(false);
+  const [messageApi, contextHolder] = message.useMessage();
 
   const statusMap = {
     running: {
@@ -77,7 +80,7 @@ export default function CardHome({ projeto, onStatusChanged }) {
     {
       label: "Última Atualização",
       value: projeto.updated_at
-        ? format(projeto.updated_at, "dd/MM/yyyy HH:mm")
+        ? format(projeto.updated_at, "dd/MM/yyyy HH:mm:ss")
         : "N/A",
     },
   ];
@@ -95,7 +98,22 @@ export default function CardHome({ projeto, onStatusChanged }) {
       okButtonProps: { danger: true },
       onOk: async () => {
         await deleteExtraction(projeto.id);
-        message.success("Projeto excluído");
+        messageApi.success("Projeto excluído");
+        onStatusChanged?.();
+      },
+    });
+  };
+
+  const handlePause = () => {
+    modal.confirm({
+      title: "Pausar extração?",
+      icon: <ExclamationCircleOutlined />,
+      okText: "Pausar",
+      cancelText: "Cancelar",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await pauseExtraction(projeto.id);
+        messageApi.success("Projeto pausado");
         onStatusChanged?.();
       },
     });
@@ -103,7 +121,6 @@ export default function CardHome({ projeto, onStatusChanged }) {
 
   const handleRetry = () => {
     form.resetFields();
-
     let modalInstance;
 
     modalInstance = modal.confirm({
@@ -111,10 +128,7 @@ export default function CardHome({ projeto, onStatusChanged }) {
       icon: <RedoOutlined />,
       okText: "Enviar",
       cancelText: "Cancelar",
-      okButtonProps: {
-        disabled: true,
-        loading: retryLoading,
-      },
+      okButtonProps: { disabled: true },
       content: (
         <Form
           form={form}
@@ -122,9 +136,7 @@ export default function CardHome({ projeto, onStatusChanged }) {
           className="mt-4"
           onValuesChange={(_, values) => {
             modalInstance.update({
-              okButtonProps: {
-                disabled: !values.token,
-              },
+              okButtonProps: { disabled: !values.token },
             });
           }}
         >
@@ -140,11 +152,13 @@ export default function CardHome({ projeto, onStatusChanged }) {
       onOk: async () => {
         try {
           const { token } = await form.validateFields();
+
           setRetryLoading(true);
+          modalInstance.update({
+            okButtonProps: { loading: true, disabled: true },
+          });
 
           localStorage.setItem("github_token", token);
-
-          await deleteExtraction(projeto.id);
 
           const newExtraction = await createExtraction(
             projeto.repository_owner,
@@ -154,16 +168,24 @@ export default function CardHome({ projeto, onStatusChanged }) {
 
           await startExtractionService(newExtraction.id, token);
 
-          message.success("Extração reiniciada com sucesso!");
+          await deleteExtraction(projeto.id);
+
+          messageApi.success("Extração reiniciada com sucesso!");
           onStatusChanged?.();
 
           return true;
         } catch (err) {
-          message.error(
-            err?.response?.data?.error || "Erro ao refazer extração."
+          messageApi.error(
+            err?.message ||
+              err?.response?.data?.error ||
+              "Token inválido ou erro ao iniciar extração."
           );
 
-          return Promise.reject();
+          modalInstance.update({
+            okButtonProps: { loading: false, disabled: false },
+          });
+
+          return false;
         } finally {
           setRetryLoading(false);
         }
@@ -173,12 +195,24 @@ export default function CardHome({ projeto, onStatusChanged }) {
 
   return (
     <Card className="mb-6 rounded-2xl bg-gray-800 border border-gray-700 shadow-lg">
+      {contextHolder}
+
       <div className="flex justify-between items-center mb-4">
         <span className="text-lg font-semibold text-gray-100">
           {projeto.repository_owner}/{projeto.repository_name}
         </span>
 
         <div className="flex gap-2">
+          {projeto.status === "running" && (
+            <Tooltip title="Pausar">
+              <Button
+                shape="circle"
+                className="bg-yellow-600 border-none text-white"
+                icon={<PauseCircleFilled />}
+                onClick={handlePause}
+              />
+            </Tooltip>
+          )}
           {showDelete && (
             <Tooltip title="Excluir">
               <Button

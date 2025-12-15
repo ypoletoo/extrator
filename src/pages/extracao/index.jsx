@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, Input, Button, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,51 +11,59 @@ export default function Extractor() {
     repoName: "",
     owner: "",
     token: "",
-    options: {
-      issues: false,
-      prs: false,
-      prComments: false,
-      commitFiles: false,
-    },
   });
 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [messageApi, contextHolder] = message.useMessage();
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleStartExtraction = async () => {
-    const { owner, repoName, token } = form;
+  const isFormValid = useMemo(() => {
+    return (
+      form.owner.trim().length > 0 &&
+      form.repoName.trim().length > 0 &&
+      form.token.trim().length > 0
+    );
+  }, [form]);
 
-    if (!owner || !repoName || !token) {
-      message.error("Preencha o Dono, Repositório e Token.", 3);
+  const handleStartExtraction = async () => {
+    if (!isFormValid) {
+      messageApi.warning("Preencha Dono, Repositório e Token do GitHub.", 3);
       return;
     }
 
     setLoading(true);
 
     try {
-      localStorage.setItem("github_token", token);
+      localStorage.setItem("github_token", form.token);
 
-      const newExtraction = await createExtraction(owner, repoName, token);
-      const extractionId = newExtraction.id;
+      const newExtraction = await createExtraction(
+        form.owner,
+        form.repoName,
+        form.token
+      );
 
-      message.info(
-        `Extração registrada (ID: ${extractionId}). Iniciando no backend...`,
+      messageApi.info(
+        `Extração registrada (ID: ${newExtraction.id.slice(0, 8)}...).`,
         3
       );
 
-      await startExtractionService(extractionId, token);
+      await startExtractionService(newExtraction.id, form.token);
 
-      message.success("Extração iniciada com sucesso!", 5);
+      messageApi.success("Extração iniciada com sucesso!", 4);
 
       navigate("/");
     } catch (error) {
       console.error("Erro ao iniciar extração:", error);
-      const errorMessage = error.response?.data?.error || "Erro desconhecido.";
-      message.error(errorMessage, 5);
+
+      messageApi.error(
+        error?.response?.data?.error ||
+          "Não foi possível iniciar a extração. Verifique os dados.",
+        5
+      );
     } finally {
       setLoading(false);
     }
@@ -63,6 +71,7 @@ export default function Extractor() {
 
   return (
     <div className="relative p-8 max-h-screen overflow-y-auto">
+      {contextHolder}
       <h2 className="text-3xl font-semibold mb-8 text-gray-800">
         Extrair Projeto
       </h2>
@@ -71,13 +80,12 @@ export default function Extractor() {
         <Card className="shadow-lg rounded-2xl transition-all duration-300">
           <div className="mb-6">
             <label className="block mb-2 text-gray-800">
-              Nome do Repositório (repoName)
+              Nome do Repositório
             </label>
             <Input
               placeholder="ex: react"
               value={form.repoName}
               onChange={(e) => updateField("repoName", e.target.value)}
-              className="placeholder-gray-400"
               size="large"
               disabled={loading}
             />
@@ -85,13 +93,12 @@ export default function Extractor() {
 
           <div className="mb-6">
             <label className="block mb-2 text-gray-800">
-              Dono do Repositório (owner)
+              Dono do Repositório
             </label>
             <Input
               placeholder="ex: facebook"
               value={form.owner}
               onChange={(e) => updateField("owner", e.target.value)}
-              className="placeholder-gray-400"
               size="large"
               disabled={loading}
             />
@@ -103,11 +110,11 @@ export default function Extractor() {
               placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxx"
               value={form.token}
               onChange={(e) => updateField("token", e.target.value)}
-              className="placeholder-gray-400"
               size="large"
               disabled={loading}
             />
           </div>
+
           <Button
             type="default"
             className="
@@ -118,7 +125,7 @@ export default function Extractor() {
             "
             onClick={handleStartExtraction}
             loading={loading}
-            disabled={loading}
+            disabled={loading || !isFormValid}
           >
             Extrair Projeto
           </Button>
