@@ -49,12 +49,12 @@ export default function Home() {
       pollingRef.current = null;
     }
 
-    const hasRunning = extractions.some(
-      (e) => e.status === "running" || e.status === "processing"
+    const hasActiveProcess = extractions.some(
+      (e) => e.status === "running" || e.status === "pending"
     );
 
-    if (hasRunning) {
-      pollingRef.current = setInterval(fetchExtractions, 10000);
+    if (hasActiveProcess) {
+      pollingRef.current = setInterval(fetchExtractions, 5000);
     }
 
     return () => {

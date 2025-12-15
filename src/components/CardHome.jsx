@@ -1,249 +1,249 @@
 import { useState } from "react";
-import { Card, Button, Input } from "antd";
+import { Card, Button, Input, Tooltip, message, App, Form } from "antd";
 import {
-  MinusOutlined,
-  ArrowUpOutlined,
-  OpenAIOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
   SyncOutlined,
   StopOutlined,
+  DeleteOutlined,
+  RedoOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { format } from "date-fns";
-const { TextArea } = Input;
+import {
+  createExtraction,
+  deleteExtraction,
+  startExtraction as startExtractionService,
+} from "../services/extractionServices";
 
-const getStatusDisplay = (status) => {
-  switch (status) {
-    case "running":
-      return {
-        label: "Em Execução",
-        icon: <SyncOutlined spin className="text-blue-400" />,
-        value: status.toUpperCase(),
-        color: "blue-400",
-      };
-    case "completed":
-      return {
-        label: "Concluída",
-        icon: <CheckCircleOutlined className="text-green-400" />,
-        value: "completa".toUpperCase(),
-        color: "green-400",
-      };
-    case "paused":
-      return {
-        label: "Pausada",
-        icon: <StopOutlined className="text-yellow-400" />,
-        value: "pausada".toUpperCase(),
-        color: "yellow-400",
-      };
-    case "created":
-      return {
-        label: "Pronta p/ Iniciar",
-        icon: <ClockCircleOutlined className="text-gray-400" />,
-        value: status.toUpperCase(),
-        color: "gray-400",
-      };
-    case "failed":
-      return {
-        label: "Falhou",
-        icon: <StopOutlined className="text-red-600" />,
-        value: "erro".toUpperCase(),
-        color: "red-600",
-      };
-    default:
-      return {
-        label: "Status Desconhecido",
-        icon: <ClockCircleOutlined className="text-gray-400" />,
-        value: status ? status.toUpperCase() : "N/A",
-        color: "gray-400",
-      };
-  }
-};
+export default function CardHome({ projeto, onStatusChanged }) {
+  const { modal } = App.useApp();
 
-export default function CardHome({ projeto }) {
-  const [aberto, setAberto] = useState(false);
-  const [texto, setTexto] = useState("");
-  const [hoveredInfo, setHoveredInfo] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(null);
+  const [form] = Form.useForm();
+  const [retryLoading, setRetryLoading] = useState(false);
 
-  const statusDisplay = getStatusDisplay(projeto.status);
+  const statusMap = {
+    running: {
+      label: "Extraindo",
+      icon: <SyncOutlined spin className="text-blue-400" />,
+      color: "text-blue-400",
+    },
+    pending: {
+      label: "Pendente",
+      icon: <ClockCircleOutlined className="text-blue-400" />,
+      color: "text-blue-400",
+    },
+    completed: {
+      label: "Concluída",
+      icon: <CheckCircleOutlined className="text-green-400" />,
+      color: "text-green-400",
+    },
+    failed: {
+      label: "Falhou",
+      icon: <StopOutlined className="text-red-500" />,
+      color: "text-red-500",
+    },
+    paused: {
+      label: "Pausada",
+      icon: <ClockCircleOutlined className="text-orange-400" />,
+      color: "text-orange-400",
+    },
+  };
+
+  const status = statusMap[projeto.status] || {
+    label: projeto.status,
+    icon: <ClockCircleOutlined />,
+    color: "text-gray-300",
+  };
 
   const infoItems = [
-    { label: "ID da Extração", value: projeto.id.slice(0, 8) + "..." },
+    {
+      label: "ID da Extração",
+      value: projeto.id.slice(0, 8) + "...",
+      full: projeto.id,
+    },
     {
       label: "Status",
-      value: statusDisplay.value,
-      icon: statusDisplay.icon,
-      color: statusDisplay.color,
+      value: status.label,
+      icon: status.icon,
+      color: status.color,
+      full:
+        status.label === "Extraindo"
+          ? `Extração ${projeto.progress_percentage}% concluída`
+          : "",
+      extra: projeto.error_message,
     },
     {
       label: "Última Atualização",
-      value: format(projeto.updated_at, "dd/MM/yyyy HH:mm") || "N/A",
+      value: projeto.updated_at
+        ? format(projeto.updated_at, "dd/MM/yyyy HH:mm")
+        : "N/A",
     },
   ];
 
+  const showDelete = ["completed", "failed", "paused"].includes(projeto.status);
+  const showRetry = ["failed", "paused"].includes(projeto.status);
+
+  const handleDelete = () => {
+    modal.confirm({
+      title: "Excluir projeto?",
+      icon: <ExclamationCircleOutlined />,
+      content: "Essa ação não pode ser desfeita.",
+      okText: "Excluir",
+      cancelText: "Cancelar",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await deleteExtraction(projeto.id);
+        message.success("Projeto excluído");
+        onStatusChanged?.();
+      },
+    });
+  };
+
+  const handleRetry = () => {
+    form.resetFields();
+
+    let modalInstance;
+
+    modalInstance = modal.confirm({
+      title: "Refazer extração?",
+      icon: <RedoOutlined />,
+      okText: "Enviar",
+      cancelText: "Cancelar",
+      okButtonProps: {
+        disabled: true,
+        loading: retryLoading,
+      },
+      content: (
+        <Form
+          form={form}
+          layout="vertical"
+          className="mt-4"
+          onValuesChange={(_, values) => {
+            modalInstance.update({
+              okButtonProps: {
+                disabled: !values.token,
+              },
+            });
+          }}
+        >
+          <Form.Item
+            label="Token do GitHub"
+            name="token"
+            rules={[{ required: true, message: "O token é obrigatório" }]}
+          >
+            <Input.Password placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxx" />
+          </Form.Item>
+        </Form>
+      ),
+      onOk: async () => {
+        try {
+          const { token } = await form.validateFields();
+          setRetryLoading(true);
+
+          localStorage.setItem("github_token", token);
+
+          await deleteExtraction(projeto.id);
+
+          const newExtraction = await createExtraction(
+            projeto.repository_owner,
+            projeto.repository_name,
+            token
+          );
+
+          await startExtractionService(newExtraction.id, token);
+
+          message.success("Extração reiniciada com sucesso!");
+          onStatusChanged?.();
+
+          return true;
+        } catch (err) {
+          message.error(
+            err?.response?.data?.error || "Erro ao refazer extração."
+          );
+
+          return Promise.reject();
+        } finally {
+          setRetryLoading(false);
+        }
+      },
+    });
+  };
+
   return (
-    <Card
-      className="
-        mb-6 shadow-lg rounded-2xl border border-gray-700 
-        bg-gray-800 transition-all duration-[1200ms] ease-in-out
-      "
-    >
-      <div className="flex flex-row items-center justify-between gap-4">
-        <div className="flex flex-row items-center gap-4">
-          {projeto.status === "completed" && (
-            <Button
-              disabled
-              className="bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
-              shape="circle"
-              onClick={() => setAberto(!aberto)}
-              icon={
-                aberto ? (
-                  <MinusOutlined className="text-gray-200" />
-                ) : (
-                  <OpenAIOutlined className="text-gray-200 h-20" />
-                )
-              }
-            />
+    <Card className="mb-6 rounded-2xl bg-gray-800 border border-gray-700 shadow-lg">
+      <div className="flex justify-between items-center mb-4">
+        <span className="text-lg font-semibold text-gray-100">
+          {projeto.repository_owner}/{projeto.repository_name}
+        </span>
+
+        <div className="flex gap-2">
+          {showDelete && (
+            <Tooltip title="Excluir">
+              <Button
+                shape="circle"
+                className="bg-red-600 border-none text-white"
+                icon={<DeleteOutlined />}
+                onClick={handleDelete}
+              />
+            </Tooltip>
           )}
 
-          <span className="text-xl font-semibold text-gray-100">
-            {projeto.repository_name}/{projeto.repository_owner}
-          </span>
+          {showRetry && (
+            <Tooltip title="Tentar novamente">
+              <Button
+                shape="circle"
+                className="bg-blue-600 border-none text-white"
+                icon={<RedoOutlined />}
+                onClick={handleRetry}
+                loading={retryLoading}
+              />
+            </Tooltip>
+          )}
         </div>
       </div>
 
-      <div className="h-px w-full bg-gray-700 my-4" />
+      <div className="flex gap-4" onMouseLeave={() => setActiveIndex(null)}>
+        {infoItems.map((item, index) => {
+          const isActive = activeIndex === index;
+          const isHidden = activeIndex !== null && !isActive;
 
-      {!aberto && (
-        <div className="relative grid grid-cols-2 md:grid-cols-3 gap-4 min-h-[100px]">
-          {infoItems.map((item, index) => (
-            <InfoItem
+          return (
+            <div
               key={index}
-              index={index}
-              label={item.label}
-              value={item.value}
-              icon={item.icon}
-              color={item.color}
-              hoveredInfo={hoveredInfo}
-              setHoveredInfo={setHoveredInfo}
-              projeto={projeto}
-            />
-          ))}
-        </div>
-      )}
+              onMouseEnter={() => setActiveIndex(index)}
+              className={`
+                transition-all duration-300 ease-out
+                rounded-xl bg-gray-700 px-4 py-4
+                ${isActive ? "flex-[3]" : "flex-1"}
+                ${isHidden ? "opacity-0 pointer-events-none" : "opacity-100"}
+              `}
+            >
+              <p className="text-gray-400 text-sm mb-1">{item.label}</p>
 
-      <div
-        className={`
-          overflow-hidden transition-all duration-[1200ms]
-          ${aberto ? "max-h-[600px]" : "max-h-0"}
-        `}
-      >
-        <div
-          className={`
-            transform transition-all duration-[1200ms]
-            ${aberto ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"}
-          `}
-        >
-          <h2 className="text-lg text-gray-200 font-bold">Pergunte algo</h2>
-          <div className="mt-6 relative">
-            <label className="text-gray-300 block mb-2 text-sm font-medium">
-              O que você quer saber sobre esse projeto?
-            </label>
+              <p
+                className={`text-lg font-medium flex items-center gap-2 ${
+                  item.color || "text-gray-100"
+                }`}
+              >
+                {item.icon}
+                {item.value}
+              </p>
 
-            <TextArea
-              rows={8}
-              size="large"
-              className="bg-gray-200 rounded-xl p-4 pr-14 resize-none"
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-            />
+              {isActive && item.full && (
+                <p className="text-gray-300 text-sm mt-3 break-all">
+                  {item.full}
+                </p>
+              )}
 
-            <Button
-              shape="circle"
-              icon={<ArrowUpOutlined />}
-              className="
-                !absolute bottom-3 right-3
-                bg-gray-800 text-gray-100
-                hover:bg-gray-700 border-none shadow-md
-              "
-              onClick={() => console.log(texto)}
-            />
-          </div>
-        </div>
+              {isActive && item.extra && (
+                <p className="text-gray-300 text-sm mt-3">{item.extra}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Card>
-  );
-}
-function InfoItem({
-  index,
-  label,
-  value,
-  icon,
-  color,
-  hoveredInfo,
-  setHoveredInfo,
-  projeto,
-}) {
-  const isHovered = hoveredInfo === index;
-  const someoneHovered = hoveredInfo !== null;
-  const shouldHide = someoneHovered && !isHovered;
-
-  return (
-    <div
-      onMouseEnter={() => setHoveredInfo(index)}
-      onMouseLeave={() => setHoveredInfo(null)}
-      className={`
-        bg-gray-700 rounded-xl px-4 py-3 shadow-md cursor-pointer
-        transition-all duration-500 overflow-hidden relative
-        h-32
-        ${isHovered ? "z-20" : "z-10"}
-        ${shouldHide ? "opacity-0 scale-90 pointer-events-none absolute" : ""}
-      `}
-      style={{
-        ...(isHovered && {
-          position: "absolute",
-          left: 0,
-          right: 0,
-          width: "100%",
-        }),
-      }}
-    >
-      <p className="text-gray-400 text-sm">{label}</p>
-
-      <p
-        className={`text-gray-100 font-medium text-lg flex items-center gap-1 ${
-          color ? `text-${color}` : ""
-        }`}
-      >
-        {icon}
-        {value}
-      </p>
-
-      <div
-        className={`
-          transition-all duration-500 text-gray-300 text-sm mt-2
-          ${isHovered ? "opacity-100" : "opacity-0"}
-        `}
-        style={{ maxHeight: isHovered ? "60px" : "0px" }}
-      >
-        {label === "Status" && (
-          <p>
-            <b>{projeto.error_message}</b>
-            {projeto.status === "running" && (
-              <span>Coletando dados ({projeto.progress_percentage}%)</span>
-            )}
-          </p>
-        )}
-        {label === "ID da Extração" && (
-          <p>
-            ID completo: <b>{projeto.id}</b>
-          </p>
-        )}
-        {label === "Última Atualização" && (
-          <p>
-            Última coleta em: <b>{projeto.updated_at || "Sem registro"}</b>
-          </p>
-        )}
-      </div>
-    </div>
   );
 }

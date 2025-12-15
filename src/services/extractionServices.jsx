@@ -35,3 +35,8 @@ export const pauseExtraction = async (extractionId) => {
   const response = await axios.post(`${API_URL}/${extractionId}/pause`);
   return response.data;
 };
+
+export const deleteExtraction = async (extractionId) => {
+  const response = await axios.delete(`${API_URL}/${extractionId}`);
+  return response.data;
+};

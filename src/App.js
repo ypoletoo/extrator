@@ -1,12 +1,15 @@
-import React from "react";
+import { App as AntApp } from "antd";
 import { BrowserRouter as Router } from "react-router-dom";
+import React from "react";
 import AppRoutesInner from "./routes/AppRoutes";
 
 const App = () => {
   return (
-    <Router>
-      <AppRoutesInner />
-    </Router>
+    <AntApp>
+      <Router>
+        <AppRoutesInner />
+      </Router>
+    </AntApp>
   );
 };
 
